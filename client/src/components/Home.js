@@ -1,95 +1,151 @@
-// src/components/Home.js
 import React, { useContext, useState } from 'react';
+import { Modal, Button } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 import { UserContext } from '../Users/UserProvider';
+import { useShoppingList } from './ShoppingListProvider';
 
-const Home = ({ shoppingLists, createShoppingList, renameList }) => {
+const Home = () => {
   const { userMap, loggedInUser } = useContext(UserContext);
+  const { 
+    shoppingLists, 
+    createShoppingList, 
+    deleteShoppingList,
+    toggleArchiveList 
+  } = useShoppingList();
+  
   const [newListName, setNewListName] = useState('');
-  const [editingListId, setEditingListId] = useState(null);
-  const [newName, setNewName] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [deleteListId, setDeleteListId] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
 
-  const getUserNameById = (userId) => {
-    return userMap[userId]?.name || 'Unknown User';
-  };
+  const handleOpenModal = () => setShowModal(true);
+  const handleCloseModal = () => setShowModal(false);
 
   const handleCreateList = () => {
     if (newListName.trim()) {
-      createShoppingList(newListName, loggedInUser); // Pass `loggedInUser` as `ownerId`
+      createShoppingList(newListName, loggedInUser);
       setNewListName('');
+      handleCloseModal();
+    } else {
+      alert('Prosím zadejte název nákupního seznamu.');
     }
   };
 
-  const startEditing = (listId, currentName) => {
-    setEditingListId(listId);
-    setNewName(currentName);
+  const handleDeleteClick = (listId) => {
+    setDeleteListId(listId);
+    setConfirmDelete(true);
   };
 
-  const saveNewName = (listId) => {
-    renameList(listId, newName);
-    setEditingListId(null);
-    setNewName('');
+  const handleConfirmDelete = () => {
+    deleteShoppingList(deleteListId);
+    setDeleteListId(null);
+    setConfirmDelete(false);
   };
 
-  // Filter lists based on user access (owner or member)
+ 
   const accessibleLists = shoppingLists.filter(
-    (list) => list.owner === loggedInUser || list.members.includes(loggedInUser)
+    (list) => (list.owner === loggedInUser || list.members.includes(loggedInUser))
+  );
+
+  const filteredLists = accessibleLists.filter(
+    (list) => showArchived ? true : !list.isArchived
   );
 
   return (
     <div className="container text-center">
       <h1 className="my-4">Nákupní seznamy</h1>
 
-      {/* Form to create a new shopping list */}
       <div className="mb-4">
-        <input
-          type="text"
-          className="form-control mb-2"
-          placeholder="Jméno nového seznamu"
-          value={newListName}
-          onChange={(e) => setNewListName(e.target.value)}
-        />
-        <button onClick={handleCreateList} className="btn btn-primary">
-          Vytvořit nový seznam
+        <button onClick={handleOpenModal} className="btn btn-primary me-2">
+          Vytvořit nový nákupní seznam
+        </button>
+        <button 
+          onClick={() => setShowArchived(!showArchived)} 
+          className="btn btn-outline-secondary"
+        >
+          {showArchived ? 'Skrýt archivované' : 'Zobrazit archivované'}
         </button>
       </div>
+      <Modal show={showModal} onHide={handleCloseModal}>
+        <Modal.Header closeButton>
+          <Modal.Title>Vytvořit nový nákupní seznam</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <input
+            type="text"
+            className="form-control mb-3"
+            placeholder="Název nákupního seznamu"
+            value={newListName}
+            onChange={(e) => setNewListName(e.target.value)}
+          />
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={handleCloseModal}>
+            Zavřít
+          </Button>
+          <Button variant="primary" onClick={handleCreateList}>
+            Vytvořit
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      
+      <Modal show={confirmDelete} onHide={() => setConfirmDelete(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Confirm Deletion</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          Opravdu chcete smazat tento nákupní seznam?
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setConfirmDelete(false)}>
+            Zrušit
+          </Button>
+          <Button variant="danger" onClick={handleConfirmDelete}>
+            Smazat
+          </Button>
+        </Modal.Footer>
+      </Modal>
 
       <div className="row">
-        {accessibleLists.map((list) => (
+        {filteredLists.map((list) => (
           <div key={list.id} className="col-md-4 mb-4">
-            <div className="card shadow-sm">
+            <div className={`card shadow-sm ${list.isArchived ? 'bg-light' : ''}`}>
               <div className="card-body">
-                {editingListId === list.id ? (
-                  <>
-                    <input
-                      type="text"
-                      className="form-control mb-2"
-                      value={newName}
-                      onChange={(e) => setNewName(e.target.value)}
-                    />
-                    <button onClick={() => saveNewName(list.id)} className="btn btn-success">
-                      Uložit
-                    </button>
-                    <button onClick={() => setEditingListId(null)} className="btn btn-secondary ml-2">
-                      Zrušit
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <h5 className="card-title">{list.name}</h5>
-                    <p className="card-text">
-                      Vlastník: {getUserNameById(list.owner)}
-                    </p>
-                    {list.owner === loggedInUser && (
-                      <button onClick={() => startEditing(list.id, list.name)} className="btn btn-outline-primary btn-sm">
-                        Přejmenovat
+                <h5 className="card-title">
+                  {list.name}
+                  {list.isArchived && (
+                    <span className="badge bg-secondary ms-2">Archivováno</span>
+                  )}
+                </h5>
+                <p className="card-text">
+                  Vlastník: {userMap[list.owner]?.name || 'Unknown User'}
+                </p>
+                <div className="d-flex gap-2 justify-content-center">
+                  {list.owner === loggedInUser && (
+                    <>
+                      <button 
+                        onClick={() => handleDeleteClick(list.id)} 
+                        className="btn btn-outline-danger"
+                      >
+                        Smazat
                       </button>
-                    )}
-                    <Link to={`/list/${list.id}`} className="btn btn-primary mt-2">
-                      Zobrazit nákupní seznam
-                    </Link>
-                  </>
-                )}
+                      <button
+                        onClick={() => toggleArchiveList(list.id)}
+                        className={`btn ${list.isArchived ? 'btn-outline-success' : 'btn-outline-secondary'}`}
+                      >
+                        {list.isArchived ? 'Obnovit' : 'Archivovat'}
+                      </button>
+                    </>
+                  )}
+                  <Link 
+                    to={`/list/${list.id}`} 
+                    className={`btn btn-primary ${list.isArchived ? 'disabled' : ''}`}
+                  >
+                    Zobrazit nákupní seznam
+                  </Link>
+                </div>
               </div>
             </div>
           </div>
