@@ -1,4 +1,3 @@
-// src/components/ShoppingListDetail.js
 import React, { useState, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { UserContext } from '../Users/UserProvider';
@@ -25,10 +24,17 @@ const ShoppingListDetail = ({
   const [newName, setNewName] = useState(list?.name || '');
   const [newItemName, setNewItemName] = useState('');
   const [newMemberName, setNewMemberName] = useState('');
-  const [showResolved, setShowResolved] = useState(true); // New state for filtering resolved items
-
+  const [showResolved, setShowResolved] = useState(true);
+  
+  if (!list || list.isArchived) {
+    return (
+      <div className="alert alert-warning">
+        {!list ? 'Seznam nenalezen!' : 'Tento seznam je archivován a nelze jej upravovat.'}
+      </div>
+    );
+  }
   if (!list || (list.owner !== loggedInUser && !list.members.includes(loggedInUser))) {
-    return <div className="alert alert-danger">Přístup zamítnut</div>;
+    return <div className="alert alert-danger">Přístup zamítnut!</div>;
   }
 
   const handleSaveNewName = () => {
@@ -40,6 +46,8 @@ const ShoppingListDetail = ({
     if (newItemName.trim()) {
       addItemToList(listId, newItemName);
       setNewItemName('');
+    } else {
+      alert('Prosím zadejte platný název položky.');
     }
   };
 
@@ -56,6 +64,8 @@ const ShoppingListDetail = ({
     if (member) {
       addMemberToList(listId, member.id);
       setNewMemberName('');
+    } else {
+      alert('Zadaný uživatel neexistuje.');
     }
   };
 
@@ -68,7 +78,6 @@ const ShoppingListDetail = ({
     navigate('/');
   };
 
-  // Filter items based on `showResolved` state
   const filteredItems = list.items.filter((item) => showResolved || !item.resolved);
 
   return (
@@ -111,7 +120,7 @@ const ShoppingListDetail = ({
               onChange={() => setShowResolved(!showResolved)}
             />
             <label className="form-check-label" htmlFor="showResolved">
-              Zobrazit vyřešené položky
+            Zobrazit vyřešené položky
             </label>
           </div>
           <ul className="list-group mb-3">
@@ -139,12 +148,12 @@ const ShoppingListDetail = ({
             <input
               type="text"
               className="form-control"
-              placeholder="Nový předmět"
+              placeholder="New Item"
               value={newItemName}
               onChange={(e) => setNewItemName(e.target.value)}
             />
             <div className="input-group-append">
-              <button onClick={handleAddItem} className="btn btn-primary">Přidat předmět</button>
+              <button onClick={handleAddItem} className="btn btn-primary">Přidat položku</button>
             </div>
           </div>
         </div>
