@@ -1,205 +1,348 @@
 import React, { useState, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { UserContext } from '../Users/UserProvider';
+import { useShoppingList } from './ShoppingListProvider';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCircle, faCheckCircle } from '@fortawesome/free-solid-svg-icons';
+import { Modal, Button } from 'react-bootstrap';
+import { useTranslation } from 'react-i18next';
+import ShoppingListDetailChart from './ShoppingListDetailChart';
 
-const ShoppingListDetail = ({
-  shoppingLists,
-  renameList,
-  addItemToList,
-  deleteItemFromList,
-  toggleItemResolved,
-  addMemberToList,
-  removeMemberFromList,
-  leaveList,
-}) => {
-  const { userMap, loggedInUser } = useContext(UserContext);
+const ShoppingListDetail = () => {
+  const { t } = useTranslation();
   const { id } = useParams();
-  const listId = parseInt(id);
-  const list = shoppingLists.find((list) => list.id === listId);
   const navigate = useNavigate();
+  const { userMap, loggedInUser } = useContext(UserContext);
+  const { 
+    shoppingLists,
+    addItemToList,
+    deleteItemFromList,
+    toggleItemResolved,
+    addMemberToList,
+    removeMemberFromList,
+    leaveList,
+    renameList
+  } = useShoppingList();
 
-  const [isEditing, setIsEditing] = useState(false);
-  const [newName, setNewName] = useState(list?.name || '');
+  // State
   const [newItemName, setNewItemName] = useState('');
-  const [newMemberName, setNewMemberName] = useState('');
   const [showResolved, setShowResolved] = useState(true);
-  
-  if (!list || list.isArchived) {
+  const [newMemberName, setNewMemberName] = useState('');
+  const [listName, setListName] = useState('');
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  const [showLeaveConfirmModal, setShowLeaveConfirmModal] = useState(false);
+
+  // Find the current list
+  const list = shoppingLists?.find(l => l.id === id);
+
+  if (!list) {
     return (
       <div className="alert alert-warning">
-        {!list ? 'Seznam nenalezen!' : 'Tento seznam je archivován a nelze jej upravovat.'}
+        {t('listNotFound')}
       </div>
     );
   }
-  if (!list || (list.owner !== loggedInUser && !list.members.includes(loggedInUser))) {
-    return <div className="alert alert-danger">Přístup zamítnut!</div>;
+
+  // Check access rights
+  const isOwner = list.owner_id === loggedInUser;
+  const isMember = list.member_ids?.includes(loggedInUser);
+  const hasAccess = isOwner || isMember;
+
+  if (!hasAccess) {
+    return <div className="alert alert-danger">{t('accessDenied')}</div>;
   }
 
-  const handleSaveNewName = () => {
-    renameList(listId, newName);
-    setIsEditing(false);
-  };
-
-  const handleAddItem = () => {
+  // Handlers
+  const handleAddItem = async () => {
     if (newItemName.trim()) {
-      addItemToList(listId, newItemName);
-      setNewItemName('');
-    } else {
-      alert('Prosím zadejte platný název položky.');
+      try {
+        await addItemToList(id, newItemName);
+        setNewItemName('');
+      } catch (error) {
+        alert(t('failedToAddItem'));
+      }
     }
   };
 
-  const handleToggleResolved = (itemId) => {
-    toggleItemResolved(listId, itemId);
+  const handleToggleResolved = async (itemId) => {
+    try {
+      await toggleItemResolved(id, itemId);
+    } catch (error) {
+      alert(t('failedToToggleItem'));
+    }
   };
 
-  const handleDeleteItem = (itemId) => {
-    deleteItemFromList(listId, itemId);
+  const handleDeleteItem = async (itemId) => {
+    try {
+      await deleteItemFromList(id, itemId);
+    } catch (error) {
+      alert(t('failedToDeleteItem'));
+    }
   };
 
-  const handleAddMember = () => {
-    const member = Object.values(userMap).find((user) => user.name === newMemberName);
+  const handleAddMember = async () => {
+    const member = Object.values(userMap).find(user => user.name === newMemberName);
     if (member) {
-      addMemberToList(listId, member.id);
-      setNewMemberName('');
+      try {
+        await addMemberToList(id, member.id);
+        setNewMemberName('');
+        setShowAddMemberModal(false);
+      } catch (error) {
+        alert(t('failedToAddMember'));
+      }
     } else {
-      alert('Zadaný uživatel neexistuje.');
+      alert(t('userNotFound'));
     }
   };
 
-  const handleRemoveMember = (memberId) => {
-    removeMemberFromList(listId, memberId);
+  const handleRemoveMember = async (memberId) => {
+    try {
+      await removeMemberFromList(id, memberId);
+    } catch (error) {
+      alert(t('failedToRemoveMember'));
+    }
   };
 
-  const handleLeaveList = () => {
-    leaveList(listId, loggedInUser);
-    navigate('/');
+  const handleLeaveList = async () => {
+    try {
+      await leaveList(id);
+      setShowLeaveConfirmModal(false);
+      navigate('/');
+    } catch (error) {
+      alert(t('failedToLeaveList'));
+    }
   };
 
-  const filteredItems = list.items.filter((item) => showResolved || !item.resolved);
+  const handleRename = async () => {
+    if (listName.trim()) {
+      try {
+        await renameList(id, listName);
+        setShowRenameModal(false);
+      } catch (error) {
+        alert(t('failedToRenameList'));
+      }
+    }
+  };
+
+  // Filter items based on showResolved
+  const items = list.items || [];
+  const filteredItems = showResolved ? items : items.filter(item => !item.is_solved);
 
   return (
-    <div>
-      <div className="card mb-3 shadow-sm">
+    <div className="container">
+      <div className="card mb-4">
         <div className="card-body">
-          {isEditing ? (
-            <>
+          <div className="d-flex justify-content-between align-items-center mb-4">
+            <h2 className="card-title mb-0">{list.name}</h2>
+            {isOwner && (
+              <button 
+                className="btn btn-outline-primary btn-sm"
+                onClick={() => {
+                  setListName(list.name);
+                  setShowRenameModal(true);
+                }}
+              >
+                {t('renameList')}
+              </button>
+            )}
+          </div>
+
+          <p className="text-muted">
+            {t('owner')}: {userMap[list.owner_id]?.name || t('unknownUser')}
+          </p>
+
+          {/* Items Section */}
+          <div className="mb-4">
+            <h4>{t('items')}</h4>
+            <div className="form-check mb-3">
+              <input
+                type="checkbox"
+                className="form-check-input"
+                id="showResolved"
+                checked={showResolved}
+                onChange={(e) => setShowResolved(e.target.checked)}
+              />
+              <label className="form-check-label" htmlFor="showResolved">
+                {t('showResolvedItems')}
+              </label>
+            </div>
+
+            <div className="input-group mb-3">
               <input
                 type="text"
-                className="form-control mb-2"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
+                className="form-control"
+                placeholder={t('newItem')}
+                value={newItemName}
+                onChange={(e) => setNewItemName(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleAddItem()}
               />
-              <button onClick={handleSaveNewName} className="btn btn-success">
-                Uložit
+              <button 
+                className="btn btn-primary"
+                onClick={handleAddItem}
+              >
+                {t('addItem')}
               </button>
-              <button onClick={() => setIsEditing(false)} className="btn btn-secondary ml-2">
-                Zrušit
-              </button>
-            </>
-          ) : (
-            <>
-              <h2 className="card-title text-primary">{list.name}</h2>
-              {list.owner === loggedInUser && (
-                <button onClick={() => setIsEditing(true)} className="btn btn-outline-primary btn-sm">
-                  Přejmenovat
+            </div>
+
+            <ul className="list-group mb-4">
+              {filteredItems.map((item) => (
+                <li 
+                  key={item.item_id}
+                  className="list-group-item d-flex justify-content-between align-items-center"
+                >
+                  <span className={item.is_solved ? 'text-muted' : ''}>
+                    {item.item_name}
+                  </span>
+                  <div>
+                    <button
+                      className={`btn btn-link me-2 ${item.is_solved ? 'text-success' : 'text-muted'}`}
+                      onClick={() => handleToggleResolved(item.item_id)}
+                    >
+                      <FontAwesomeIcon 
+                        icon={item.is_solved ? faCheckCircle : faCircle} 
+                        size="lg"
+                      />
+                    </button>
+                    <button
+                      className="btn btn-danger btn-sm"
+                      onClick={() => handleDeleteItem(item.item_id)}
+                    >
+                      {t('delete')}
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+
+            {/* Items Status Chart */}
+            <div className="mb-4">
+              <h4>Items Status</h4>
+              <ShoppingListDetailChart items={items} />
+            </div>
+          </div>
+
+          {/* Members Section */}
+          <div className="mb-4">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h4 className="mb-0">{t('members')}</h4>
+              {isOwner && (
+                <button 
+                  className="btn btn-outline-primary btn-sm"
+                  onClick={() => setShowAddMemberModal(true)}
+                >
+                  {t('addMember')}
                 </button>
               )}
-            </>
-          )}
+            </div>
 
-          <h3>Předměty</h3>
-          <div className="form-check mb-3">
-            <input
-              type="checkbox"
-              className="form-check-input"
-              id="showResolved"
-              checked={showResolved}
-              onChange={() => setShowResolved(!showResolved)}
-            />
-            <label className="form-check-label" htmlFor="showResolved">
-            Zobrazit vyřešené položky
-            </label>
-          </div>
-          <ul className="list-group mb-3">
-            {filteredItems.map((item) => (
-              <li key={item.id} className="list-group-item d-flex justify-content-between align-items-center">
-                <span>{item.name}</span>
-                <div className="d-flex align-items-center">
-                  <FontAwesomeIcon
-                    icon={item.resolved ? faCheckCircle : faCircle}
-                    className={`icon ${item.resolved ? 'text-success' : 'text-muted'}`}
-                    onClick={() => handleToggleResolved(item.id)}
-                    style={{ cursor: 'pointer', fontSize: '1.5rem', marginRight: '10px' }}
-                  />
-                  <button
-                    onClick={() => handleDeleteItem(item.id)}
-                    className="btn btn-danger btn-sm"
+            <ul className="list-group">
+              {list.member_ids?.map((memberId) => {
+                const member = userMap[memberId];
+                return (
+                  <li 
+                    key={memberId}
+                    className="list-group-item d-flex justify-content-between align-items-center"
                   >
-                    Smazat
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-          <div className="input-group mb-2">
-            <input
-              type="text"
-              className="form-control"
-              placeholder="New Item"
-              value={newItemName}
-              onChange={(e) => setNewItemName(e.target.value)}
-            />
-            <div className="input-group-append">
-              <button onClick={handleAddItem} className="btn btn-primary">Přidat položku</button>
-            </div>
+                    {member?.name || t('unknownUser')}
+                    {isOwner && memberId !== list.owner_id && (
+                      <button
+                        className="btn btn-danger btn-sm"
+                        onClick={() => handleRemoveMember(memberId)}
+                      >
+                        {t('removeMember')}
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+
+          <div className="d-flex justify-content-between">
+            <button 
+              className="btn btn-secondary"
+              onClick={() => navigate('/')}
+            >
+              {t('backToList')}
+            </button>
+            {!isOwner && (
+              <button 
+                className="btn btn-danger"
+                onClick={() => setShowLeaveConfirmModal(true)}
+              >
+                {t('leaveList')}
+              </button>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="card shadow-sm">
-        <div className="card-body">
-          <h3 className="card-title">Uživatelé</h3>
-          <div className="input-group mb-2">
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Jméno uživatele"
-              value={newMemberName}
-              onChange={(e) => setNewMemberName(e.target.value)}
-            />
-            <div className="input-group-append">
-              <button onClick={handleAddMember} className="btn btn-primary">Přidat uživatele</button>
-            </div>
-          </div>
-          <ul className="list-group mt-3">
-            {list.members.map((memberId) => {
-              const member = userMap[memberId];
-              return (
-                <li key={memberId} className="list-group-item d-flex justify-content-between align-items-center">
-                  {member ? member.name : 'Unknown'}
-                  {loggedInUser === list.owner && memberId !== list.owner && (
-                    <button
-                      onClick={() => handleRemoveMember(memberId)}
-                      className="btn btn-danger btn-sm"
-                    >
-                      Odebrat
-                    </button>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      </div>
+      {/* Rename Modal */}
+      <Modal show={showRenameModal} onHide={() => setShowRenameModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>{t('renameList')}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <input
+            type="text"
+            className="form-control"
+            value={listName}
+            onChange={(e) => setListName(e.target.value)}
+            placeholder={t('listName')}
+          />
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowRenameModal(false)}>
+            {t('cancel')}
+          </Button>
+          <Button variant="primary" onClick={handleRename}>
+            {t('save')}
+          </Button>
+        </Modal.Footer>
+      </Modal>
 
-      {loggedInUser !== list.owner && (
-        <button onClick={handleLeaveList} className="btn btn-danger mt-3">
-          Opustit seznam
-        </button>
-      )}
+      {/* Add Member Modal */}
+      <Modal show={showAddMemberModal} onHide={() => setShowAddMemberModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>{t('addMember')}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <input
+            type="text"
+            className="form-control"
+            placeholder={t('enterUsername')}
+            value={newMemberName}
+            onChange={(e) => setNewMemberName(e.target.value)}
+          />
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowAddMemberModal(false)}>
+            {t('cancel')}
+          </Button>
+          <Button variant="primary" onClick={handleAddMember}>
+            {t('add')}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Leave Confirm Modal */}
+      <Modal show={showLeaveConfirmModal} onHide={() => setShowLeaveConfirmModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>{t('leaveList')}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {t('leaveListConfirmation')}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowLeaveConfirmModal(false)}>
+            {t('cancel')}
+          </Button>
+          <Button variant="danger" onClick={handleLeaveList}>
+            {t('leave')}
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 };

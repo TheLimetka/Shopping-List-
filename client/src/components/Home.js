@@ -3,8 +3,11 @@ import { Modal, Button } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 import { UserContext } from '../Users/UserProvider';
 import { useShoppingList } from './ShoppingListProvider';
+import { useTranslation } from 'react-i18next';
+import ShoppingListsOverview from './ShoppingListsOverview';
 
 const Home = () => {
+  const { t } = useTranslation();
   const { userMap, loggedInUser } = useContext(UserContext);
   const { 
     shoppingLists, 
@@ -15,8 +18,8 @@ const Home = () => {
   
   const [newListName, setNewListName] = useState('');
   const [showModal, setShowModal] = useState(false);
-  const [deleteListId, setDeleteListId] = useState(null);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedListId, setSelectedListId] = useState(null);
   const [showArchived, setShowArchived] = useState(false);
 
   const handleOpenModal = () => setShowModal(true);
@@ -28,114 +31,132 @@ const Home = () => {
       setNewListName('');
       handleCloseModal();
     } else {
-      alert('Prosím zadejte název nákupního seznamu.');
+      alert(t('Please enter a shopping list name'));
     }
   };
 
   const handleDeleteClick = (listId) => {
-    setDeleteListId(listId);
-    setConfirmDelete(true);
+    setSelectedListId(listId);
+    setShowDeleteModal(true);
   };
 
-  const handleConfirmDelete = () => {
-    deleteShoppingList(deleteListId);
-    setDeleteListId(null);
-    setConfirmDelete(false);
+  const handleConfirmDelete = async () => {
+    try {
+      await deleteShoppingList(selectedListId);
+      setShowDeleteModal(false);
+      setSelectedListId(null);
+    } catch (error) {
+      console.error('Failed to delete list:', error);
+      alert(t('Failed to delete list'));
+    }
   };
 
- 
-  const accessibleLists = shoppingLists.filter(
-    (list) => (list.owner === loggedInUser || list.members.includes(loggedInUser))
-  );
+  const handleArchiveList = async (listId) => {
+    try {
+      await toggleArchiveList(listId);
+    } catch (error) {
+      console.error('Failed to archive list:', error);
+      alert(t('Failed to archive list'));
+    }
+  };
 
-  const filteredLists = accessibleLists.filter(
-    (list) => showArchived ? true : !list.isArchived
-  );
-
+  const accessibleLists = Array.isArray(shoppingLists) 
+  ? shoppingLists.filter(list => 
+      // First check if we should show this list based on archive status
+      (showArchived || !list.isArchived) &&
+      // Then check if user has access (is owner or member)
+      (list.owner_id === loggedInUser || list.member_ids?.includes(loggedInUser))
+    )
+  : [];
   return (
     <div className="container text-center">
-      <h1 className="my-4">Nákupní seznamy</h1>
+      <h1 className="my-4">{t('shoppingLists')}</h1>
 
       <div className="mb-4">
         <button onClick={handleOpenModal} className="btn btn-primary me-2">
-          Vytvořit nový nákupní seznam
+          {t('createList')}
         </button>
         <button 
           onClick={() => setShowArchived(!showArchived)} 
           className="btn btn-outline-secondary"
         >
-          {showArchived ? 'Skrýt archivované' : 'Zobrazit archivované'}
+          {showArchived ? t('hideArchived') : t('showArchived')}
         </button>
       </div>
+
+      {/* Shopping Lists Overview Chart */}
+      <ShoppingListsOverview shoppingLists={accessibleLists} />
+
+      {/* Create List Modal */}
       <Modal show={showModal} onHide={handleCloseModal}>
         <Modal.Header closeButton>
-          <Modal.Title>Vytvořit nový nákupní seznam</Modal.Title>
+          <Modal.Title>{t('createNewList')}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <input
             type="text"
             className="form-control mb-3"
-            placeholder="Název nákupního seznamu"
+            placeholder={t('listName')}
             value={newListName}
             onChange={(e) => setNewListName(e.target.value)}
           />
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={handleCloseModal}>
-            Zavřít
+            {t('close')}
           </Button>
           <Button variant="primary" onClick={handleCreateList}>
-            Vytvořit
+            {t('create')}
           </Button>
         </Modal.Footer>
       </Modal>
 
-      
-      <Modal show={confirmDelete} onHide={() => setConfirmDelete(false)}>
+      {/* Delete Confirmation Modal */}
+      <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)}>
         <Modal.Header closeButton>
-          <Modal.Title>Confirm Deletion</Modal.Title>
+          <Modal.Title>{t('confirmDelete')}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          Opravdu chcete smazat tento nákupní seznam?
+          {t('deleteConfirmMessage')}
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={() => setConfirmDelete(false)}>
-            Zrušit
+          <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
+            {t('cancel')}
           </Button>
           <Button variant="danger" onClick={handleConfirmDelete}>
-            Smazat
+            {t('delete')}
           </Button>
         </Modal.Footer>
       </Modal>
 
-      <div className="row">
-        {filteredLists.map((list) => (
-          <div key={list.id} className="col-md-4 mb-4">
-            <div className={`card shadow-sm ${list.isArchived ? 'bg-light' : ''}`}>
+      <div className="row justify-content-center">
+        {accessibleLists.map((list) => (
+          <div key={list.id} className="col-md-6 mb-4">
+            <div className={`card ${list.isArchived ? 'bg-light' : ''}`}>
               <div className="card-body">
                 <h5 className="card-title">
                   {list.name}
                   {list.isArchived && (
-                    <span className="badge bg-secondary ms-2">Archivováno</span>
+                    <span className="badge bg-secondary ms-2">{t('archived')}</span>
                   )}
                 </h5>
                 <p className="card-text">
-                  Vlastník: {userMap[list.owner]?.name || 'Unknown User'}
+                  {t('owner')}: {userMap[list.owner_id]?.name || t('Unknown User')}
                 </p>
-                <div className="d-flex gap-2 justify-content-center">
-                  {list.owner === loggedInUser && (
+                <div className="d-flex justify-content-center gap-2">
+                  {list.owner_id === loggedInUser && (
                     <>
                       <button 
-                        onClick={() => handleDeleteClick(list.id)} 
-                        className="btn btn-outline-danger"
+                        className="btn btn-danger"
+                        onClick={() => handleDeleteClick(list.id)}
                       >
-                        Smazat
+                        {t('delete')}
                       </button>
                       <button
-                        onClick={() => toggleArchiveList(list.id)}
-                        className={`btn ${list.isArchived ? 'btn-outline-success' : 'btn-outline-secondary'}`}
+                        className="btn btn-secondary"
+                        onClick={() => handleArchiveList(list.id)}
                       >
-                        {list.isArchived ? 'Obnovit' : 'Archivovat'}
+                        {list.isArchived ? t('restore') : t('archive')}
                       </button>
                     </>
                   )}
@@ -143,7 +164,7 @@ const Home = () => {
                     to={`/list/${list.id}`} 
                     className={`btn btn-primary ${list.isArchived ? 'disabled' : ''}`}
                   >
-                    Zobrazit nákupní seznam
+                    {t('viewList')}
                   </Link>
                 </div>
               </div>

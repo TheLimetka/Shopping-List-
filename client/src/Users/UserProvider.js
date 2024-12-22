@@ -1,12 +1,14 @@
 import React, { createContext, useState } from 'react';
+
 export const UserContext = createContext();
 
 const UserProvider = ({ children }) => {
-  const [loggedInUser, setLoggedInUser] = useState('u1'); 
+  const [loggedInUser, setLoggedInUser] = useState('1'); // Start with user 1
+  
   const userMap = {
-    u1: { id: 'u1', name: 'User 1' },
-    u2: { id: 'u2', name: 'User 2' },
-    u3: { id: 'u3', name: 'User 3' }
+    '1': { id: '1', name: 'Alice' },
+    '2': { id: '2', name: 'Bob' },
+    '3': { id: '3', name: 'Jonáš' }
   };
 
   const switchUser = (userId) => {
@@ -16,7 +18,11 @@ const UserProvider = ({ children }) => {
   };
 
   return (
-    <UserContext.Provider value={{ userMap, loggedInUser, switchUser }}>
+    <UserContext.Provider value={{ 
+      userMap, 
+      loggedInUser, 
+      switchUser 
+    }}>
       {children}
     </UserContext.Provider>
   );
