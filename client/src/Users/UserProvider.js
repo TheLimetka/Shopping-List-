@@ -3,7 +3,7 @@ import React, { createContext, useState } from 'react';
 export const UserContext = createContext();
 
 const UserProvider = ({ children }) => {
-  const [loggedInUser, setLoggedInUser] = useState('1'); // Start with user 1
+  const [loggedInUser, setLoggedInUser] = useState('1');
   
   const userMap = {
     '1': { id: '1', name: 'Alice' },

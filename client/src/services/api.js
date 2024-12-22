@@ -1,4 +1,3 @@
-
 const BASE_URL = 'http://localhost:5000';
 
 const apiCall = async (endpoint, options = {}) => {
