@@ -167,7 +167,7 @@ i18n
   .use(initReactI18next)
   .init({
     resources,
-    lng: localStorage.getItem('language') || 'cs', // Default to Czech
+    lng: localStorage.getItem('language') || 'cs',
     fallbackLng: 'en',
     interpolation: {
       escapeValue: false,

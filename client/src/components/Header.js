@@ -1,4 +1,3 @@
-// src/components/Header.js
 import React, { useContext } from 'react';
 import { useTranslation } from 'react-i18next';
 import { UserContext } from '../Users/UserProvider';

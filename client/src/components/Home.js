@@ -62,9 +62,7 @@ const Home = () => {
 
   const accessibleLists = Array.isArray(shoppingLists) 
   ? shoppingLists.filter(list => 
-      // First check if we should show this list based on archive status
-      (showArchived || !list.isArchived) &&
-      // Then check if user has access (is owner or member)
+       (showArchived || !list.isArchived) &&
       (list.owner_id === loggedInUser || list.member_ids?.includes(loggedInUser))
     )
   : [];

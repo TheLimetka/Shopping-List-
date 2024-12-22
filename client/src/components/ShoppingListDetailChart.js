@@ -17,7 +17,7 @@ const ShoppingListDetailChart = ({ items = [] }) => {
         { name: t('unsolvedItems'), value: unsolvedCount }
       ];
 
-  const COLORS = ['#4ade80', '#fb923c']; // Green for solved, Orange for unsolved
+  const COLORS = ['#4ade80', '#fb923c'];
 
   const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
@@ -58,7 +58,7 @@ const ShoppingListDetailChart = ({ items = [] }) => {
           <Legend
             align="center"
             verticalAlign="bottom"
-            formatter={(value) => value} // Now using translated values from data
+            formatter={(value) => value}
             wrapperStyle={{
               color: isDarkMode ? '#fff' : '#000'
             }}

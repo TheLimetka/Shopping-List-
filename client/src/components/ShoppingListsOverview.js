@@ -6,8 +6,6 @@ import { useTheme } from '../contexts/ThemeContext';
 const ShoppingListsOverview = ({ shoppingLists = [] }) => {
   const { t } = useTranslation();
   const { isDarkMode } = useTheme();
-
-  // Filter out archived lists and prepare data
   const chartData = shoppingLists
     .filter(list => !list.isArchived)
     .map(list => ({

@@ -1,4 +1,4 @@
-// src/services/api.js
+
 const BASE_URL = 'http://localhost:5000';
 
 const apiCall = async (endpoint, options = {}) => {
@@ -7,7 +7,7 @@ const apiCall = async (endpoint, options = {}) => {
       ...options,
       headers: {
         'Content-Type': 'application/json',
-        'user_id': localStorage.getItem('userId') || '1', // Match backend user IDs
+        'user_id': localStorage.getItem('userId') || '1',
         ...options.headers,
       },
     });
@@ -17,7 +17,6 @@ const apiCall = async (endpoint, options = {}) => {
       throw new Error(error.message || 'API request failed');
     }
 
-    // Handle empty responses (like from DELETE)
     const contentType = response.headers.get('content-type');
     if (contentType && contentType.includes('application/json')) {
       return response.json();
